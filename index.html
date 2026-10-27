@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#243b65">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="AR2Eパレット">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>AR2E チャットパレット生成</title>
+<style>
+:root{color-scheme:light;--ink:#1f2937;--muted:#5b6472;--line:#d9e0eb;--bg:#f2f5fa;--accent:#294d86;--soft:#e9eff8;--ok:#e9f7ee;--err:#fff0ef}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Helvetica Neue",YuGothic,sans-serif;-webkit-text-size-adjust:100%}
+main{max-width:760px;margin:0 auto;padding:calc(16px + env(safe-area-inset-top)) 14px calc(28px + env(safe-area-inset-bottom))}
+header{padding:8px 2px 12px}
+h1{font-size:1.42rem;line-height:1.35;margin:0 0 8px;letter-spacing:.01em}
+.lead{margin:0;color:var(--muted);font-size:.95rem}
+.panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;margin:13px 0;box-shadow:0 2px 8px #182b4508}
+h2{font-size:1.05rem;margin:0 0 12px}
+label{display:block;font-weight:650;margin:10px 0 6px}
+input[type=file],input[type=url],textarea{font:inherit;width:100%;border:1px solid #bdc9da;border-radius:11px;padding:12px;background:#fff;color:var(--ink)}
+input[type=file]{padding:12px 8px;font-size:.93rem}
+textarea{min-height:96px;resize:vertical}
+#output{min-height:260px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;line-height:1.5}
+button{font:inherit;font-weight:700;border:0;border-radius:11px;padding:13px 14px;background:var(--accent);color:white;width:100%;min-height:48px;margin-top:10px;touch-action:manipulation}
+button.secondary{background:var(--soft);color:#243954}
+button:disabled{opacity:.55}
+.hint,.small{color:var(--muted);font-size:.88rem;margin:8px 0 0}
+.status{white-space:pre-wrap;padding:11px 12px;border-radius:10px;background:#edf2fa;margin-top:12px;font-size:.92rem;overflow-wrap:anywhere}
+.status.ok{background:var(--ok);color:#205b37}.status.error{background:var(--err);color:#8a2727}
+.count{color:var(--muted);font-size:.88rem;margin-top:10px}
+.divider{border:0;border-top:1px solid var(--line);margin:16px 0}
+.step{display:inline-flex;align-items:center;justify-content:center;background:#e7edf8;color:#294d86;width:27px;height:27px;border-radius:50%;margin-right:6px;font-size:.85rem}
+details{margin-top:10px}summary{font-weight:650;cursor:pointer;padding:6px 0}
+@media(min-width:600px){main{padding-left:22px;padding-right:22px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions button{margin-top:10px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>アリアンロッド2E<br>チャットパレット生成</h1>
+<p class="lead">ゆとシートのJSON／HTMLファイルから、ココフォリア用のチャットパレットを作ります。</p>
+</header>
+
+<section class="panel">
+<h2><span class="step">1</span>キャラクターシートを読み込む</h2>
+<label for="file">JSON／HTMLファイルを選択</label>
+<input id="file" type="file" accept=".json,.html,.htm,application/json,text/html">
+<p class="hint">iPhoneでは「ファイルを選択」を押し、「ファイル」アプリ内に保存したJSONまたはHTMLを選んでください。データはこの端末のブラウザ内で処理され、送信されません。</p>
+<details>
+<summary>ファイルが手元にない場合</summary>
+<p class="hint">ゆとシートを開き、キャラクターシートの出力機能からJSONまたはHTMLを「ファイル」に保存してから、このページに戻って選択してください。URLだけでは読み込めない場合があります。</p>
+</details>
+<div id="status" class="status" role="status" aria-live="polite">JSONまたはHTMLファイルを選択してください。</div>
+<div id="summary" class="count"></div>
+</section>
+
+<section class="panel">
+<h2><span class="step">2</span>追加するパッシブスキル（任意）</h2>
+<label for="passives">スキル名（複数ある場合は改行区切り）</label>
+<textarea id="passives" placeholder="例：バタフライダンス"></textarea>
+<p class="hint">通常は空欄のままで大丈夫です。読み込んだシートに存在するスキルを指定した場合、出力に追加します。</p>
+<button id="refresh" class="secondary">設定を反映して再生成</button>
+</section>
+
+<section class="panel">
+<h2><span class="step">3</span>生成結果</h2>
+<textarea id="output" placeholder="読み込み後、ここにチャットパレットが表示されます。" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+<div class="actions">
+<button id="copy">チャットパレットをコピー</button>
+<button id="download" class="secondary">テキストファイルを保存</button>
+</div>
+<p class="hint">コピーできない場合は、出力欄を長押しして「すべてを選択」→「コピー」を選んでください。</p>
+</section>
+
+<section class="panel">
+<h2>ホーム画面に追加する方法</h2>
+<p class="hint">このアプリをWeb上に公開したあと、iPhoneのSafariで開き、共有ボタン →「ホーム画面に追加」を選ぶと、次回からアプリアイコンで起動できます。</p>
+</section>
+<p class="small">このアプリは読み込んだキャラクターシートを外部に送信しません。URLからの直接取得機能は、通信制限により失敗しやすいため省き、ファイル読み込みを基本にしています。</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let loadedSkills=[];
+function setStatus(t,k=''){const e=$('status');e.textContent=t;e.className='status '+k}
+function clean(v){return v===null||v===undefined?'':String(v).replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim()}
+function isDash(v){return !clean(v)||/^[―ー－\-‐−]+$/.test(clean(v))}
+function isPassive(t){return /パッシブ|passive/i.test(clean(t))}
+function normalizeTiming(v){
+ let t=clean(v);
+ const replacements=[
+ [/セットアップ\s*プロセス/g,'セットアップ'],[/メジャー\s*アクション/g,'メジャー'],
+ [/ムーブ\s*アクション/g,'ムーブ'],[/イニシア\s*チブ/g,'イニシアチブ'],
+ [/クリンナップ\s*プロセス/g,'クリンナップ'],[/リア\s*クション/g,'リアクション'],
+ [/DR\s*の\s*直前/g,'DR前'],[/DR\s*の\s*直後/g,'DR後'],[/判定\s*の\s*直前/g,'判定前']
+ ];
+ for(const [re,to] of replacements)t=t.replace(re,to);
+ return t;
+}
+function dedupe(a){return a.filter((s,i)=>s.name&&a.findIndex(x=>x.name===s.name&&x.sl===s.sl&&x.timing===s.timing)===i)}
+function fromYutorizeJSON(obj){
+ if(!obj||typeof obj!=='object'||Array.isArray(obj))throw Error('JSONの最上位がオブジェクト形式ではありません。');
+ const skills=[],ids=new Set();
+ for(const key of Object.keys(obj)){const m=key.match(/^skill(\d+)Name$/);if(m&&clean(obj[key]))ids.add(Number(m[1]));}
+ for(const i of [...ids].sort((a,b)=>a-b)){
+  const read=suffix=>clean(obj[`skill${i}${suffix}`]),name=read('Name');if(!name)continue;
+  skills.push({name,sl:read('Lv')||'1',timing:normalizeTiming(read('Timing')),judge:read('Roll'),target:read('Target'),range:read('Range'),cost:read('Cost'),condition:read('Reqd'),effect:read('Note'),source:'json'});
+ }
+ if(!skills.length)throw Error('JSON内にスキル項目が見つかりません。ゆとシートのJSON出力か確認してください。');
+ return dedupe(skills);
+}
+function fromYutorizeHTML(source){
+ const doc=new DOMParser().parseFromString(source,'text/html'),section=doc.querySelector('#skills');
+ if(!section)throw Error('HTML内にスキル欄が見つかりません。ゆとシートのHTML出力か確認してください。');
+ const table=section.querySelector('table');if(!table)throw Error('HTMLのスキル欄に表が見つかりません。');
+ const result=[];
+ for(const tr of table.querySelectorAll('tr')){
+  const nameCell=tr.querySelector('td.name');if(!nameCell)continue;
+  const cells=[...tr.querySelectorAll(':scope > td')];if(cells.length<10)continue;
+  const value=i=>clean(cells[i]?.innerText||cells[i]?.textContent||''),noteRow=tr.nextElementSibling,noteCell=noteRow?.querySelector('td.note');
+  result.push({name:clean(nameCell.innerText||nameCell.textContent),sl:value(3)||'1',timing:normalizeTiming(value(4)),judge:value(5),target:value(6),range:value(7),cost:value(8),condition:value(9),effect:clean(noteCell?.innerText||noteCell?.textContent||''),source:'html'});
+ }
+ if(!result.length)throw Error('HTMLのスキル表からスキルを抽出できませんでした。');
+ return dedupe(result);
+}
+function parseInput(text,filename=''){
+ const raw=text.trim();if(!raw)throw Error('ファイルが空です。');
+ const ext=(filename.split('.').pop()||'').toLowerCase();
+ if(ext==='json'||raw.startsWith('{')||raw.startsWith('[')){try{return fromYutorizeJSON(JSON.parse(raw))}catch(e){throw e}}
+ if(ext==='html'||ext==='htm'||/<html|<!doctype/i.test(raw))return fromYutorizeHTML(raw);
+ throw Error('JSONまたはHTMLファイルを選択してください。');
+}
+function generate(){
+ const extras=$('passives').value.split(/[\n、,，]+/).map(s=>s.trim().replace(/[「」『』《》]/g,'')).filter(Boolean);
+ const outputSkills=loadedSkills.filter(s=>!isPassive(s.timing)),missing=[];
+ for(const name of extras){const match=loadedSkills.find(s=>s.name.replace(/[「」『』《》]/g,'')===name);if(match&&!outputSkills.some(s=>s.name===match.name&&s.sl===match.sl))outputSkills.push(match);else if(!match)missing.push(name)}
+ const lines=[];
+ for(const s of outputSkills){const fields=[s.timing,s.judge,s.target,s.range,s.cost].map(v=>isDash(v)?'―':clean(v));let declaration=`《${s.name}》${s.sl||'1'} ${fields[0]}/${fields[1]}/${fields[2]}/${fields[3]}/${fields[4]}`;if(s.effect)declaration+=' '+s.effect;lines.push(declaration);if(!isDash(s.cost)&&/^\d+(?:\.\d+)?$/.test(clean(s.cost)))lines.push(':MP-'+clean(s.cost))}
+ if(missing.length){lines.push('');lines.push('【読み込みデータ内で見つからなかった追加スキル】');for(const n of missing)lines.push('《'+n+'》')}
+ $('output').value=lines.join('\n');
+ $('summary').textContent=`読み込み：${loadedSkills.length}スキル ／ 出力：${outputSkills.length}スキル ／ パッシブ除外：${loadedSkills.filter(s=>isPassive(s.timing)).length}スキル`;
+ if(missing.length)setStatus(`生成しました。ただし追加指定した ${missing.length} 件はデータ内に見つかりませんでした。名前を確認してください。`);else setStatus('チャットパレットを生成しました。コピーしてココフォリアに貼り付けてください。','ok');
+}
+function loadData(text,filename=''){try{loadedSkills=parseInput(text,filename);generate()}catch(e){setStatus('読み込みエラー：'+(e?.message||String(e)),'error');$('summary').textContent=''}}
+$('file').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;setStatus('ファイルを解析しています…');try{loadData(await f.text(),f.name)}catch(err){setStatus('ファイルを読み込めませんでした。','error')}});
+$('refresh').onclick=()=>{if(!loadedSkills.length){setStatus('先にJSON／HTMLファイルを読み込んでください。','error');return}generate()};
+async function copyOutput(){
+ const value=$('output').value;if(!value){setStatus('先にJSON／HTMLファイルを読み込んでください。','error');return}
+ try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(value);setStatus('チャットパレットをコピーしました。','ok');return}}catch(e){}
+ $('output').focus();$('output').select();$('output').setSelectionRange(0,$('output').value.length);setStatus('出力欄を選択しました。表示されたメニューから「コピー」を選んでください。');
+}
+$('copy').onclick=copyOutput;
+$('download').onclick=()=>{
+ const value=$('output').value;if(!value){setStatus('先にJSON／HTMLファイルを読み込んでください。','error');return}
+ const blob=new Blob([value],{type:'text/plain;charset=utf-8'}),u=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=u;a.download='AR2E_ココフォリア_チャットパレット.txt';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);
+};
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}
+</script>
+</body></html>
